@@ -12,7 +12,16 @@ def carregar_dados(empresas):
     cotacoes_acao = cotacoes_acao["Close"]
     return cotacoes_acao
 
-acoes = ["ITUB4.SA", "PETR4.SA", "MGLU3.SA", "VALE3.SA", "ABEV3.SA", "GGBR4.SA"]
+
+@st.cache_data
+def carregar_tickers_acoes():
+    base_tickers = pd.read_csv("IBOV.csv", sep=";")
+    tickers = list(base_tickers["Codigo"])
+    print(tickers)
+    tickers = [item + ".SA" for item in tickers]
+    return tickers
+
+acoes = carregar_tickers_acoes()
 dados = carregar_dados(acoes)
 
 #preparar vizualiações = filtros ações
@@ -23,7 +32,6 @@ if lista_acoes:
         acao_unica = lista_acoes[0]
         dados = dados.rename(columns={acao_unica: "Close"})
 
-print(lista_acoes)
 
 # filtros gerais
 st.sidebar.header("Filtros")
@@ -46,3 +54,46 @@ O gráfica abaixo representa a evolução do preço das ações selecionadas ao 
 
 # criar grafico
 st.line_chart(dados)
+
+texto_performance_ativos = ""
+
+if  len(lista_acoes) == 0:
+    lista_acoes = list(dados.columns)
+elif  len(lista_acoes)==1:
+    dados = dados.rename(columns={"Close": acao_unica})
+
+carteira = [1000 for acao in lista_acoes]
+total_inicial_carteira = sum(carteira)
+
+for i, acao in enumerate(lista_acoes):
+    performance_ativo = dados[acao].iloc[-1] / dados[acao].iloc[0] - 1
+    performance_ativo = float(performance_ativo)
+
+    carteira[i]= carteira[i] * ( 1 + performance_ativo)
+
+    if performance_ativo > 0:
+        texto_performance_ativos =  texto_performance_ativos + f"  \n{acao}: :green[{performance_ativo:.1%}]"
+    elif performance_ativo < 0:
+        texto_performance_ativos =  texto_performance_ativos + f"  \n{acao}: :red[{performance_ativo:.1%}]"
+    else:
+        texto_performance_ativos =  texto_performance_ativos + f"  \n{acao}: {performance_ativo:.1%}"
+
+total_final_carteira = sum(carteira)
+performance_carteira = total_final_carteira / total_inicial_carteira - 1
+
+if performance_carteira > 0:
+        texto_performance_carteira = f"Performance da carteira com todos os ativos: :green[{performance_carteira:.1%}]"
+elif performance_ativo < 0:
+        texto_performance_carteira =  f"Performance da carteira com todos os ativos: :green[{performance_carteira:.1%}]"
+else:
+        texto_performance_carteira =  f"Performance da carteira com todos os ativos: {performance_carteira}"
+
+st.write(f"""
+### Performance dos ativos
+Essa foi a performance de cada ativo no periodo selecionado:
+         
+{texto_performance_ativos}
+
+{texto_performance_carteira}
+""")
+
